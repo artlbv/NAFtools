@@ -2,7 +2,7 @@
 
 if [  $# = 0 ]; then
     echo "Usage:"
-    echo "./SubmitSIM.sh InDir(pattern) [SplitFactor]"
+    echo "./SubmitSIM.sh InDir [OutDir] [JobName]"
     exit 0
 else
     InDir=$1
@@ -12,7 +12,7 @@ if [ -d $InDir ]; then
     #running over whole dir
     echo "Running over whole dir" $InDir
 
-    NumbFiles=$(find $InDir/ -type f -name "*.root" | wc -l)
+    NumbFiles=$(find $InDir -type f -name "processed" | wc -l)
 else
     #running over pattern in dir
     prefix=$(basename $InDir)
@@ -20,18 +20,24 @@ else
 
     echo "Running over prefix" $prefix
 
-    NumbFiles=$(find $inDir/ -type f -name "$prefix*.root" | wc -l)
+    NumbFiles=$(find $inDir -type f -name "processed" | wc -l)
 #    echo $NumbFiles
 fi
 
-echo "Found $NumbFiles matching files in $InDir"
+echo "Found $NumbFiles processed files in $InDir"
 
 NumbJobs=$((NumbFiles))
 
 echo "Going to submit $NumbJobs Jobs:"
-#echo "with $chunks chunks per file ($chunkSize events)"
 
-qsub -t 1-$NumbJobs RAWjob.sh $InDir
-#SumEvents=$(())
-#qsub -t 1-$NumJobs -cwd -V MGjob.sh $OutDir $OutName
-#qsub -V -cwd -t 1-10 SIMjob.sh LHE/
+if [ $# -ge 1 ]; then
+    OutDir=$2
+else
+    OutDir=""
+fi
+
+if [ $# = 3 ]; then
+    qsub -t 1-$NumbJobs -o logs -N $3 RAWjob.sh $InDir $OutDir
+else
+    qsub -t 1-$NumbJobs -o logs RAWjob.sh $InDir $OutDir
+fi

@@ -21,30 +21,29 @@
 ##$ -m a
 #$ -l site=hh
 ## define outputdir,executable,config file and LD_LIBRARY_PATH
-#$ -v BASEDIR=/afs/desy.de/user/l/lobanov/scratch/SUSY/Run2/Generators/CMSSW_7_0_6/src/RECOtoMiniAOD/Batch
-#$ -v OUTDIR=/afs/desy.de/user/l/lobanov/scratch/SUSY/Run2/Generators/CMSSW_7_0_6/src/RECOtoMiniAOD/Batch/Output
 #$ -v EXECUTABLE=miniAOD_prod_template.py
-#$ -v CMSRUN=/cvmfs/cms.cern.ch/slc6_amd64_gcc481/cms/cmssw/CMSSW_7_0_6/bin/slc6_amd64_gcc481/cmsRun
-#$ -o /afs/desy.de/user/l/lobanov/scratch/SUSY/Run2/Generators/CMSSW_7_0_6/src/RECOtoMiniAOD/Batch/logs
-#$ -e /afs/desy.de/user/l/lobanov/scratch/SUSY/Run2/Generators/CMSSW_7_0_6/src/RECOtoMiniAOD/Batch/erlogs
 
 echo job start at `date`
 echo "Running job on machine " `uname -a`
-#echo "Shell: "$SHELL
-#export SHELL=/bin/sh
-#env SHELL=/bin/sh
-export PYTHONHOME=/cvmfs/cms.cern.ch/slc6_amd64_gcc472/external/python/2.7.3-cms5
-#export SCRAM_ARCH=slc5_amd64_gcc472
 
-cd $BASEDIR
+# expect to be in basedir already
+BASEDIR=`pwd -P`
+echo "Locating in "$BASEDIR
+
+
+eval `/cvmfs/cms.cern.ch/common/scramv1 runtime -sh`
+CMSRUN=`which cmsRun`
 
 TaskID=$((SGE_TASK_ID))
 echo "SGE_TASK_ID: " $TaskID
 
 InDir=$1
 
-#echo "Calculated: ChunkSize Chunks FileNumb ChunkNumb"
-#echo "Calculated:" $ChunkSize $Chunks $FileNumb $ChunkNumb
+if [ $# = 2 ]; then
+    OUTDIR=$BASEDIR/$2
+else
+    OUTDIR=$BASEDIR/Output
+fi
 
 if [ -d $InDir ]; then
     InDirName=$InDir
@@ -54,28 +53,29 @@ else
     Prefix=$(basename $InDir)
 fi
 
-INfile=$(find $InDirName/  ! -name "histProbFunction.root" -name "$Prefix*.root" | sed ''$TaskID'q;d')
+procfile=$(find $InDirName/ -name "processed" | sed ''$TaskID'q;d')
+FileINdir=$(dirname $procfile)
+INfile=$(find $FileINdir ! -name "histProbFunction.root" -name "$Prefix*.root")
 INfile=$(readlink -f $INfile)
 
-#echo "Searching in $InDirName ($InDir) $INfile"
-#alias "cmsRun=/cvmfs/cms.cern.ch/slc6_amd64_gcc472/cms/cmssw/CMSSW_7_0_6/bin/slc6_amd64_gcc472/cmsRun"
-#eval `scram runtime -sh`
+echo "Running on file" $INfile
+# check whether alreadey processed
+INdir=$(dirname $INfile)
 
-#INfile=$(ls $inDir | sed ''$SGE_TASK_ID'q;d')
+if [ ! -f "$INdir/processed" ]; then
+    echo "Didn't finish processing previous step!"
+    exit 1
+fi
 
 OutFile=$(basename $INfile)
 OutFile=${OutFile/_GEN-SIM-RECO/_MiniAOD}
 LHEmodel=$(echo ${OutFile/_run_/x} | cut -d 'x' -f 1)
 SeedName=$(echo ${OutFile/_chunk/x} | cut -d 'x' -f 1)
 ChunkName=${OutFile/.root/}
-#ChunkName=${OutFile/_GEN-SIM/_GEN-SIM-RAW}
 
-echo "Running on file" $INfile
 echo "To produce output" $OutFile
 
-#JobDir=$OUTDIR/Job_$JobdD
 JobDir=$OUTDIR/$LHEmodel/$SeedName/$ChunkName
-#JobDir=${JobDir/_GEN-SIM/_GEN-SIM-RAW}
 
 echo "Changing to workdir" $JobDir
 
@@ -107,10 +107,13 @@ touch processing
 memtime=/usr/bin/time
 $memtime -v $CMSRUN MiniAOD.py >> cmsRun.log 2>&1
 rm processing
-touch processed
 
-if [ -f "$OutFile" ]; then
+if [ -f $OutFile ]; then
+    echo "Sucessfully processed!"
     touch processed
+else
+    echo "Failed processing!"
+    touch failed
 fi
 
 echo "Complete at " `date`
