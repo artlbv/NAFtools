@@ -85,7 +85,7 @@ fi
 
 cd $JobDir
 
-if [ -f processing ]; then
+if [ -f processing ] && [ ! -f failed ]; then
     echo "Already processing!"
     echo "Aborting."
     exit 1

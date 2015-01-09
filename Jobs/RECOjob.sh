@@ -76,7 +76,7 @@ fi
 
 cd $JobDir
 
-if [ -f processing ]; then
+if [ -f processing ]  && [ ! -f failed ]; then
     echo "Already processing this chunk!"
     echo "Stopping."
     exit 1
